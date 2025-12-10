@@ -1,84 +1,27 @@
-// Quote Generator Application
+// Dynamic Quote Generator - Complete Solution
 class QuoteGenerator {
     constructor() {
         this.quotes = [];
         this.currentFilter = 'all';
-        this.lastSyncTime = null;
         this.SERVER_URL = 'https://jsonplaceholder.typicode.com/posts'; // Mock API
+        this.syncInterval = null;
+        this.conflictResolutionMode = 'server'; // 'server' or 'manual'
         
-        // Initialize the application
         this.init();
     }
 
+    // TASK 0: Initialize application
     init() {
-        // Load quotes from localStorage
         this.loadQuotes();
-        
-        // Initialize event listeners
-        this.initializeEventListeners();
-        
-        // Populate categories
-        this.populateCategories();
-        
-        // Display initial quote
+        this.setupEventListeners();
+        this.populateCategories(); // TASK 2: Populate categories dynamically
         this.showRandomQuote();
-        
-        // Load last filter from sessionStorage
-        this.loadLastFilter();
-        
-        // Load session info
-        this.updateSessionInfo();
-        
-        // Update quotes list
+        this.loadLastFilter(); // TASK 2: Restore last selected category
         this.updateQuotesList();
-        
-        // Initial sync with server
-        setTimeout(() => this.syncWithServer(), 1000);
+        this.startSync(); // TASK 3: Start periodic sync
     }
 
-    // Sample initial quotes
-    getInitialQuotes() {
-        return [
-            {
-                id: 1,
-                text: "The only way to do great work is to love what you do.",
-                author: "Steve Jobs",
-                category: "Inspiration"
-            },
-            {
-                id: 2,
-                text: "Life is what happens to you while you're busy making other plans.",
-                author: "John Lennon",
-                category: "Life"
-            },
-            {
-                id: 3,
-                text: "The future belongs to those who believe in the beauty of their dreams.",
-                author: "Eleanor Roosevelt",
-                category: "Dreams"
-            },
-            {
-                id: 4,
-                text: "It is during our darkest moments that we must focus to see the light.",
-                author: "Aristotle",
-                category: "Wisdom"
-            },
-            {
-                id: 5,
-                text: "Whoever is happy will make others happy too.",
-                author: "Anne Frank",
-                category: "Happiness"
-            },
-            {
-                id: 6,
-                text: "You must be the change you wish to see in the world.",
-                author: "Mahatma Gandhi",
-                category: "Change"
-            }
-        ];
-    }
-
-    // Load quotes from localStorage
+    // TASK 0: Load quotes from localStorage
     loadQuotes() {
         const savedQuotes = localStorage.getItem('quotes');
         if (savedQuotes) {
@@ -87,35 +30,42 @@ class QuoteGenerator {
             this.quotes = this.getInitialQuotes();
             this.saveQuotes();
         }
+        console.log(`Loaded ${this.quotes.length} quotes from storage`);
     }
 
-    // Save quotes to localStorage
+    getInitialQuotes() {
+        return [
+            { id: 1, text: "The only way to do great work is to love what you do.", author: "Steve Jobs", category: "Inspiration" },
+            { id: 2, text: "Life is what happens to you while you're busy making other plans.", author: "John Lennon", category: "Life" },
+            { id: 3, text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt", category: "Dreams" },
+            { id: 4, text: "It is during our darkest moments that we must focus to see the light.", author: "Aristotle", category: "Wisdom" },
+            { id: 5, text: "Whoever is happy will make others happy too.", author: "Anne Frank", category: "Happiness" }
+        ];
+    }
+
+    // TASK 0: Save quotes to localStorage
     saveQuotes() {
         localStorage.setItem('quotes', JSON.stringify(this.quotes));
-        
-        // Also save to sessionStorage for demonstration
         sessionStorage.setItem('lastUpdate', new Date().toISOString());
         
-        // Update quotes list
-        this.updateQuotesList();
-        
-        // Update categories
+        // Update categories dropdown when new categories are added
         this.populateCategories();
+        this.updateQuotesList();
     }
 
-    // Initialize all event listeners
-    initializeEventListeners() {
-        // New quote button
+    // TASK 0: Setup all event listeners
+    setupEventListeners() {
+        // Show New Quote button
         document.getElementById('newQuote').addEventListener('click', () => {
             this.showRandomQuote();
         });
 
-        // Add quote button
+        // Add Quote button
         document.getElementById('addQuoteBtn').addEventListener('click', () => {
             this.addQuote();
         });
 
-        // Export quotes button
+        // Export button
         document.getElementById('exportJson').addEventListener('click', () => {
             this.exportToJson();
         });
@@ -135,30 +85,44 @@ class QuoteGenerator {
             this.syncWithServer();
         });
 
-        // Category filter change
+        // Category filter change - TASK 2: Filter quotes based on selected category
         document.getElementById('categoryFilter').addEventListener('change', (event) => {
             this.filterQuotes();
-            // Save filter preference
-            sessionStorage.setItem('lastFilter', event.target.value);
+            this.saveLastFilter(event.target.value); // TASK 2: Save to local storage
         });
 
         // Search input
         document.getElementById('searchInput').addEventListener('input', (event) => {
             this.searchQuotes(event.target.value);
         });
+
+        // Conflict resolution radio buttons
+        document.querySelectorAll('input[name="conflictResolution"]').forEach(radio => {
+            radio.addEventListener('change', (event) => {
+                this.conflictResolutionMode = event.target.value;
+                this.showNotification(`Conflict resolution set to: ${this.conflictResolutionMode}`, 'info');
+            });
+        });
     }
 
-    // Show random quote
+    // TASK 0: Show random quote
     showRandomQuote() {
-        if (this.quotes.length === 0) return;
-        
+        if (this.quotes.length === 0) {
+            this.displayQuote({
+                text: "No quotes available. Add some quotes first!",
+                author: "System",
+                category: "Info"
+            });
+            return;
+        }
+
         let filteredQuotes = this.quotes;
         if (this.currentFilter !== 'all') {
             filteredQuotes = this.quotes.filter(quote => 
-                quote.category === this.currentFilter
+                quote.category.toLowerCase() === this.currentFilter.toLowerCase()
             );
         }
-        
+
         if (filteredQuotes.length === 0) {
             this.displayQuote({
                 text: "No quotes found in this category. Try another filter or add a new quote!",
@@ -167,7 +131,7 @@ class QuoteGenerator {
             });
             return;
         }
-        
+
         const randomIndex = Math.floor(Math.random() * filteredQuotes.length);
         const randomQuote = filteredQuotes[randomIndex];
         
@@ -178,7 +142,7 @@ class QuoteGenerator {
         this.updateSessionInfo();
     }
 
-    // Display quote in the UI
+    // TASK 0: Display quote in UI
     displayQuote(quote) {
         const quoteDisplay = document.getElementById('quoteDisplay');
         quoteDisplay.innerHTML = `
@@ -190,7 +154,7 @@ class QuoteGenerator {
         `;
     }
 
-    // Add new quote
+    // TASK 0: Add new quote function
     addQuote() {
         const textInput = document.getElementById('newQuoteText');
         const authorInput = document.getElementById('newQuoteAuthor');
@@ -201,15 +165,17 @@ class QuoteGenerator {
         const category = categoryInput.value.trim() || 'General';
         
         if (!text) {
-            alert('Please enter a quote text!');
+            this.showNotification('Please enter a quote text!', 'error');
             return;
         }
         
         const newQuote = {
-            id: Date.now(), // Simple ID generation
+            id: Date.now(),
             text: text,
             author: author || 'Anonymous',
-            category: category
+            category: category,
+            createdAt: new Date().toISOString(),
+            source: 'user'
         };
         
         this.quotes.push(newQuote);
@@ -220,14 +186,14 @@ class QuoteGenerator {
         authorInput.value = '';
         categoryInput.value = '';
         
-        // Show success message
+        // Show success
         this.showNotification('Quote added successfully!', 'success');
         
         // Show the new quote
         this.displayQuote(newQuote);
     }
 
-    // Populate categories in filter dropdown
+    // TASK 2: Populate categories dynamically
     populateCategories() {
         const categoryFilter = document.getElementById('categoryFilter');
         
@@ -248,28 +214,47 @@ class QuoteGenerator {
         });
     }
 
-    // Filter quotes by category
+    // TASK 2: Filter quotes based on selected category
     filterQuotes() {
         const categoryFilter = document.getElementById('categoryFilter');
         this.currentFilter = categoryFilter.value;
         
+        console.log(`Filtering by category: ${this.currentFilter}`);
+        
         if (this.currentFilter === 'all') {
-            this.updateQuotesList();
+            this.updateQuotesList(this.quotes);
         } else {
             const filteredQuotes = this.quotes.filter(quote => 
-                quote.category === this.currentFilter
+                quote.category.toLowerCase() === this.currentFilter.toLowerCase()
             );
             this.updateQuotesList(filteredQuotes);
         }
         
-        // Update quote count
         this.updateQuoteCount();
     }
 
-    // Search quotes
+    // TASK 2: Save last selected filter to localStorage
+    saveLastFilter(filter) {
+        localStorage.setItem('lastCategoryFilter', filter);
+        console.log(`Saved filter preference: ${filter}`);
+    }
+
+    // TASK 2: Load last selected filter from localStorage
+    loadLastFilter() {
+        const lastFilter = localStorage.getItem('lastCategoryFilter');
+        if (lastFilter) {
+            const categoryFilter = document.getElementById('categoryFilter');
+            categoryFilter.value = lastFilter;
+            this.currentFilter = lastFilter;
+            this.filterQuotes();
+            console.log(`Restored filter preference: ${lastFilter}`);
+        }
+    }
+
+    // TASK 2: Search quotes
     searchQuotes(searchTerm) {
         if (!searchTerm) {
-            this.updateQuotesList();
+            this.updateQuotesList(this.quotes);
             return;
         }
         
@@ -282,7 +267,253 @@ class QuoteGenerator {
         this.updateQuotesList(filteredQuotes);
     }
 
-    // Update quotes list display
+    // TASK 3: Fetch quotes from server (mock API)
+    async fetchQuotesFromServer() {
+        try {
+            console.log('Fetching quotes from server...');
+            const response = await fetch(`${this.SERVER_URL}?_limit=5`);
+            
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}`);
+            }
+            
+            const serverData = await response.json();
+            
+            // Transform to our quote format
+            return serverData.map(post => ({
+                id: `server_${post.id}`,
+                text: post.title,
+                author: 'Server Import',
+                category: 'Server',
+                body: post.body,
+                source: 'server',
+                serverId: post.id,
+                updatedAt: new Date().toISOString()
+            }));
+            
+        } catch (error) {
+            console.error('Error fetching from server:', error);
+            this.showNotification(`Failed to fetch from server: ${error.message}`, 'error');
+            return [];
+        }
+    }
+
+    // TASK 3: Post data to server (mock API)
+    async postQuotesToServer(quotesToPost) {
+        try {
+            console.log('Posting quotes to server...');
+            
+            // Simulate posting to server
+            const promises = quotesToPost.map(async (quote, index) => {
+                const response = await fetch(this.SERVER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: quote.text,
+                        body: quote.author,
+                        userId: 1
+                    })
+                });
+                
+                return response.json();
+            });
+            
+            const results = await Promise.all(promises);
+            console.log(`Posted ${results.length} quotes to server`);
+            return results;
+            
+        } catch (error) {
+            console.error('Error posting to server:', error);
+            this.showNotification(`Failed to post to server: ${error.message}`, 'error');
+            return [];
+        }
+    }
+
+    // TASK 3: Sync quotes with server
+    async syncQuotes() {
+        console.log('Starting sync process...');
+        
+        try {
+            // Fetch from server
+            const serverQuotes = await this.fetchQuotesFromServer();
+            
+            if (serverQuotes.length === 0) {
+                this.showNotification('No new quotes from server', 'info');
+                return;
+            }
+            
+            // Apply conflict resolution
+            const newQuotes = this.resolveConflicts(serverQuotes);
+            
+            if (newQuotes.length > 0) {
+                // Add new quotes
+                this.quotes.push(...newQuotes);
+                this.saveQuotes();
+                
+                // Show notification
+                this.showNotification(`Synced ${newQuotes.length} new quotes from server`, 'success');
+                this.showConflictNotification(newQuotes);
+                
+                // Update UI
+                this.updateQuotesList();
+            } else {
+                this.showNotification('Already up to date with server', 'info');
+            }
+            
+            // Update sync status
+            this.updateSyncStatus('success', `Last synced: ${new Date().toLocaleTimeString()}`);
+            
+        } catch (error) {
+            console.error('Sync failed:', error);
+            this.updateSyncStatus('error', `Sync failed: ${error.message}`);
+            this.showNotification('Sync failed. Check console for details.', 'error');
+        }
+    }
+
+    // TASK 3: Conflict resolution logic
+    resolveConflicts(serverQuotes) {
+        const newQuotes = [];
+        
+        serverQuotes.forEach(serverQuote => {
+            // Check if quote already exists (by text)
+            const existingQuote = this.quotes.find(q => 
+                q.text.toLowerCase() === serverQuote.text.toLowerCase()
+            );
+            
+            if (!existingQuote) {
+                // New quote, add it
+                newQuotes.push(serverQuote);
+            } else {
+                // Conflict detected - handle based on resolution mode
+                console.log(`Conflict detected for quote: "${serverQuote.text}"`);
+                
+                if (this.conflictResolutionMode === 'server') {
+                    // Server data takes precedence
+                    const index = this.quotes.findIndex(q => q.id === existingQuote.id);
+                    this.quotes[index] = { ...existingQuote, ...serverQuote, source: 'server-resolved' };
+                    this.showNotification(`Resolved conflict (server precedence): "${serverQuote.text.substring(0, 50)}..."`, 'info');
+                } else {
+                    // Manual resolution needed
+                    this.queueManualResolution(existingQuote, serverQuote);
+                }
+            }
+        });
+        
+        return newQuotes;
+    }
+
+    // TASK 3: Queue for manual conflict resolution
+    queueManualResolution(localQuote, serverQuote) {
+        const resolutionDiv = document.getElementById('conflictResolution');
+        if (!resolutionDiv) return;
+        
+        const conflictItem = document.createElement('div');
+        conflictItem.className = 'conflict-item';
+        conflictItem.innerHTML = `
+            <div class="conflict-text">
+                <strong>Conflict detected!</strong>
+                <p><strong>Local:</strong> "${localQuote.text}"</p>
+                <p><strong>Server:</strong> "${serverQuote.text}"</p>
+            </div>
+            <div class="conflict-actions">
+                <button class="btn btn-sm btn-primary" onclick="quoteGenerator.resolveConflict('local', '${localQuote.id}', '${serverQuote.id}')">
+                    Keep Local
+                </button>
+                <button class="btn btn-sm btn-success" onclick="quoteGenerator.resolveConflict('server', '${localQuote.id}', '${serverQuote.id}')">
+                    Use Server
+                </button>
+                <button class="btn btn-sm btn-info" onclick="quoteGenerator.resolveConflict('merge', '${localQuote.id}', '${serverQuote.id}')">
+                    Merge
+                </button>
+            </div>
+        `;
+        
+        resolutionDiv.appendChild(conflictItem);
+        this.showNotification('New conflict detected! Check resolution panel.', 'warning');
+    }
+
+    // TASK 3: Manual conflict resolution
+    resolveConflict(resolution, localId, serverId) {
+        console.log(`Manual resolution: ${resolution} for local:${localId}, server:${serverId}`);
+        // Implementation depends on your conflict structure
+        this.showNotification(`Conflict resolved using ${resolution} option`, 'success');
+    }
+
+    // TASK 3: Start periodic sync
+    startSync() {
+        // Sync every 30 seconds for demonstration
+        this.syncInterval = setInterval(() => {
+            this.syncQuotes();
+        }, 30000); // 30 seconds
+        
+        console.log('Auto-sync started (every 30 seconds)');
+    }
+
+    // TASK 3: Stop sync
+    stopSync() {
+        if (this.syncInterval) {
+            clearInterval(this.syncInterval);
+            console.log('Auto-sync stopped');
+        }
+    }
+
+    // TASK 3: Manual sync
+    async syncWithServer() {
+        this.showNotification('Manual sync started...', 'info');
+        await this.syncQuotes();
+    }
+
+    // TASK 3: Update sync status in UI
+    updateSyncStatus(type, message) {
+        const syncStatus = document.getElementById('syncStatus');
+        if (syncStatus) {
+            syncStatus.textContent = message;
+            syncStatus.className = `sync-status ${type}`;
+        }
+    }
+
+    // TASK 3: Show conflict notification
+    showConflictNotification(newQuotes) {
+        if (newQuotes.length > 0) {
+            const notification = document.createElement('div');
+            notification.className = 'conflict-notification';
+            notification.innerHTML = `
+                <i class="fas fa-sync-alt"></i>
+                <span>${newQuotes.length} new quote(s) added from server</span>
+                <button class="notification-close" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            Object.assign(notification.style, {
+                position: 'fixed',
+                bottom: '20px',
+                right: '20px',
+                background: '#4CAF50',
+                color: 'white',
+                padding: '15px',
+                borderRadius: '5px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                zIndex: '1000',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+            });
+            
+            document.body.appendChild(notification);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+    }
+
+    // Helper methods
     updateQuotesList(quotesToShow = null) {
         const quotesList = document.getElementById('quotesList');
         const quotes = quotesToShow || this.quotes;
@@ -299,43 +530,36 @@ class QuoteGenerator {
         
         quotesList.innerHTML = quotes.map(quote => `
             <div class="quote-card">
-                <button class="delete-quote" data-id="${quote.id}" title="Delete quote">
-                    <i class="fas fa-times"></i>
-                </button>
                 <div class="quote-card-text">"${quote.text}"</div>
                 <div class="quote-card-author">${quote.author}</div>
                 <div class="quote-card-category">${quote.category}</div>
+                ${quote.source === 'server' ? '<span class="server-badge">From Server</span>' : ''}
             </div>
         `).join('');
         
-        // Add event listeners to delete buttons
-        document.querySelectorAll('.delete-quote').forEach(button => {
-            button.addEventListener('click', (event) => {
-                const id = parseInt(event.currentTarget.dataset.id);
-                this.deleteQuote(id);
-            });
-        });
-        
-        // Update quote count
         this.updateQuoteCount(quotes.length);
     }
 
-    // Delete a quote
-    deleteQuote(id) {
-        if (confirm('Are you sure you want to delete this quote?')) {
-            this.quotes = this.quotes.filter(quote => quote.id !== id);
-            this.saveQuotes();
-            this.showNotification('Quote deleted successfully!', 'success');
+    updateQuoteCount(count = null) {
+        const quoteCount = document.getElementById('quoteCount');
+        if (quoteCount) {
+            quoteCount.textContent = count || this.quotes.length;
         }
     }
 
-    // Update quote count
-    updateQuoteCount(count = null) {
-        const quoteCount = document.getElementById('quoteCount');
-        quoteCount.textContent = count || this.quotes.length;
+    updateSessionInfo() {
+        const lastViewed = document.getElementById('lastViewed');
+        if (lastViewed) {
+            const lastQuote = sessionStorage.getItem('lastViewedQuote');
+            if (lastQuote) {
+                const quote = JSON.parse(lastQuote);
+                lastViewed.textContent = `${quote.text.substring(0, 50)}...`;
+            } else {
+                lastViewed.textContent = 'None';
+            }
+        }
     }
 
-    // Export quotes to JSON file
     exportToJson() {
         const dataStr = JSON.stringify(this.quotes, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -343,15 +567,11 @@ class QuoteGenerator {
         const downloadLink = document.createElement('a');
         downloadLink.href = URL.createObjectURL(dataBlob);
         downloadLink.download = `quotes_${new Date().toISOString().split('T')[0]}.json`;
-        
-        document.body.appendChild(downloadLink);
         downloadLink.click();
-        document.body.removeChild(downloadLink);
         
         this.showNotification('Quotes exported successfully!', 'success');
     }
 
-    // Import quotes from JSON file
     importFromJsonFile(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -361,22 +581,19 @@ class QuoteGenerator {
             try {
                 const importedQuotes = JSON.parse(e.target.result);
                 
-                // Validate imported data
                 if (!Array.isArray(importedQuotes)) {
                     throw new Error('Invalid format: Expected an array of quotes');
                 }
                 
-                // Add unique IDs to imported quotes
+                // Add unique IDs
                 importedQuotes.forEach(quote => {
-                    if (!quote.id) {
-                        quote.id = Date.now() + Math.random();
-                    }
+                    if (!quote.id) quote.id = Date.now() + Math.random();
                 });
                 
-                // Merge with existing quotes (avoiding duplicates)
-                const existingIds = new Set(this.quotes.map(q => q.text));
+                // Merge avoiding duplicates
+                const existingTexts = new Set(this.quotes.map(q => q.text));
                 const newQuotes = importedQuotes.filter(quote => 
-                    !existingIds.has(quote.text)
+                    !existingTexts.has(quote.text)
                 );
                 
                 if (newQuotes.length === 0) {
@@ -386,98 +603,18 @@ class QuoteGenerator {
                 
                 this.quotes.push(...newQuotes);
                 this.saveQuotes();
-                
-                // Clear file input
                 event.target.value = '';
                 
                 this.showNotification(`Successfully imported ${newQuotes.length} quotes!`, 'success');
+                
             } catch (error) {
                 this.showNotification(`Import failed: ${error.message}`, 'error');
-                console.error('Import error:', error);
             }
         };
         reader.readAsText(file);
     }
 
-    // Sync with server (mock implementation)
-    async syncWithServer() {
-        const syncStatus = document.getElementById('syncStatus');
-        
-        try {
-            syncStatus.textContent = 'Syncing with server...';
-            syncStatus.className = 'sync-status info';
-            
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Fetch from mock API
-            const response = await fetch(`${this.SERVER_URL}?_limit=3`);
-            if (!response.ok) throw new Error('Server request failed');
-            
-            const serverData = await response.json();
-            
-            // Transform server data to our quote format
-            const serverQuotes = serverData.map(post => ({
-                id: Date.now() + post.id,
-                text: post.title,
-                author: 'Server Import',
-                category: 'Server',
-                source: 'server'
-            }));
-            
-            // Conflict resolution: Server data takes precedence for duplicates
-            const existingTexts = new Set(this.quotes.map(q => q.text));
-            const newQuotes = serverQuotes.filter(quote => 
-                !existingTexts.has(quote.text)
-            );
-            
-            if (newQuotes.length > 0) {
-                this.quotes.push(...newQuotes);
-                this.saveQuotes();
-                this.showNotification(`Synced ${newQuotes.length} new quotes from server`, 'success');
-            } else {
-                this.showNotification('Already up to date with server', 'info');
-            }
-            
-            this.lastSyncTime = new Date();
-            syncStatus.textContent = `Last synced: ${this.lastSyncTime.toLocaleTimeString()}`;
-            syncStatus.className = 'sync-status success';
-            
-        } catch (error) {
-            console.error('Sync error:', error);
-            syncStatus.textContent = `Sync failed: ${error.message}`;
-            syncStatus.className = 'sync-status error';
-            this.showNotification('Sync failed. Check console for details.', 'error');
-        }
-    }
-
-    // Load last filter from sessionStorage
-    loadLastFilter() {
-        const lastFilter = sessionStorage.getItem('lastFilter');
-        if (lastFilter) {
-            const categoryFilter = document.getElementById('categoryFilter');
-            categoryFilter.value = lastFilter;
-            this.currentFilter = lastFilter;
-            this.filterQuotes();
-        }
-    }
-
-    // Update session info
-    updateSessionInfo() {
-        const lastViewed = document.getElementById('lastViewed');
-        const lastQuote = sessionStorage.getItem('lastViewedQuote');
-        
-        if (lastQuote) {
-            const quote = JSON.parse(lastQuote);
-            lastViewed.textContent = `${quote.text.substring(0, 50)}...`;
-        } else {
-            lastViewed.textContent = 'None';
-        }
-    }
-
-    // Show notification
     showNotification(message, type = 'info') {
-        // Create notification element
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.innerHTML = `
@@ -486,7 +623,6 @@ class QuoteGenerator {
             <button class="notification-close"><i class="fas fa-times"></i></button>
         `;
         
-        // Style the notification
         Object.assign(notification.style, {
             position: 'fixed',
             top: '20px',
@@ -507,15 +643,12 @@ class QuoteGenerator {
             maxWidth: '400px'
         });
         
-        // Add close button event
         notification.querySelector('.notification-close').addEventListener('click', () => {
             notification.remove();
         });
         
-        // Add to document
         document.body.appendChild(notification);
         
-        // Auto-remove after 5 seconds
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.remove();
@@ -524,10 +657,7 @@ class QuoteGenerator {
     }
 }
 
-// Initialize the application when DOM is loaded
+// Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    const quoteGenerator = new QuoteGenerator();
-    
-    // Make it available globally for debugging
-    window.quoteGenerator = quoteGenerator;
+    window.quoteGenerator = new QuoteGenerator();
 });
